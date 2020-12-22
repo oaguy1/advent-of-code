@@ -27,8 +27,8 @@ class Passport():
         self.passport_id = passport_id
         self.country_id = country_id
 
-        self._hair_regex = re.compile("^#[0-9a-zA-Z]{6}$")
-        self._passport_id_regex = re.compile("^\d{9}$")
+        self._hair_regex = re.compile(r"^#[0-9a-zA-Z]{6}$")
+        self._passport_id_regex = re.compile(r"^\d{9}$")
     
     def __repr__(self):
         return f"{self.__class__}: {self.__dict__}"
