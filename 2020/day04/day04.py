@@ -25,6 +25,9 @@ class Passport():
         self.eye_color = eye_color
         self.passport_id = passport_id
         self.country_id = country_id
+    
+    def __repr__(self):
+        return f"{self.__class__}: {self.__dict__}"
 
     def is_valid(self):
         return self.birth_year != None \
@@ -55,8 +58,10 @@ def day04(lst):
 
     attrs = []
     for idx, ln in enumerate(lst):
+        if ln != '':
+            attrs += [ attr.split(':') for attr in ln.split(' ') ]
+        
         if ln == '' or idx == len(lst) - 1:
-            print('ATTRS', attrs)
             passport = Passport.from_dict(dict(attrs))
             passport_count += 1
            
@@ -64,11 +69,8 @@ def day04(lst):
                 valid_count += 1
 
             attrs = []
-        else:
-            attrs += [ attr.split(':') for attr in ln.split(' ') ]
 
-    
-    return passport_count, valid_count
+    return valid_count
 
 
 if __name__ == '__main__':
