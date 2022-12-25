@@ -24,18 +24,6 @@ def get_counted(bag_half: str):
     return counted
 
 
-def get_letters(counts: List[bool]):
-    letters = []
-    for idx, bool_value in enumerate(counts):
-        if bool_value:
-            if idx < 26:
-                letters.append(chr(idx+97))
-            else:
-                letters.append(chr(idx+65))
-    
-    return letters
-
-
 def get_priorities(counts: List[int]):
     return [ idx * count for idx, count in enumerate(counts, 1) if count ]
 
@@ -71,3 +59,24 @@ if __name__ == "__main__":
             global_counted = add_counts(combined_counted, global_counted)
 
     print("Part 1:", sum(get_priorities(global_counted)))
+
+    global_counted = [0] * 26 * 2
+
+    with open(sys.argv[1], 'r') as f:
+        lines = f.readlines()
+
+        while lines:
+            elf_1 = get_counted(lines[0])
+            elf_2 = get_counted(lines[1])
+            elf_3 = get_counted(lines[2])
+
+
+            combined_counted = and_list(elf_1, elf_2)
+            combined_counted = and_list(elf_3, combined_counted)
+            global_counted = add_counts(combined_counted, global_counted)
+
+            lines.pop(0)
+            lines.pop(0)
+            lines.pop(0)
+
+    print("Part 2:", sum(get_priorities(global_counted)))
