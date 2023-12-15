@@ -101,6 +101,74 @@
 
     (reduce #'(lambda (x y) (or x y)) (map 'list #'car results))))
 
+(defun gear-ratio (arr i j)
+  ;; skip all this work if the character isn't #\*
+  (when (not (eql #\* (aref arr j i)))
+    (return-from gear-ratio nil))
+  
+  (let ((digits '())
+	(max-i (- (array-dimension arr 1) 1))
+	(max-j (- (array-dimension arr 0) 1)))
+
+    ;; diagonally up and to the left
+    (let ((x (- i 1))
+	  (y (- j 1))) 
+      (unless (or (= i 0) (= j 0))
+	(if (digit-char-p (aref arr y x))
+            (setf digits (append digits (list (parse-integer (coerce (list (aref arr y x)) 'string))))))))
+
+    ;; directly to the left
+    (let ((x (- i 1))
+	  (y j))
+      (unless (= i 0)
+	(if (digit-char-p (aref arr y x))
+            (setf digits (append digits (list (parse-integer (coerce (list (aref arr y x)) 'string))))))))
+
+
+    ;; diagonally down and to the left
+    (let ((x (- i 1))
+	  (y (+ j 1)))
+      (unless (or (= j max-j) (= i 0))
+	(if (digit-char-p (aref arr y x))
+            (setf digits (append digits (list (parse-integer (coerce (list (aref arr y x)) 'string))))))))
+
+    ;; directly above
+    (let ((x i)
+	  (y (- j 1)))
+      (unless (= j 0)
+	(if (digit-char-p (aref arr y x))
+            (setf digits (append digits (list (parse-integer (coerce (list (aref arr y x)) 'string))))))))
+
+    ;; directly below
+    (let ((x i)
+	  (y (+ j 1)))
+      (unless (= j max-j)
+	(if (digit-char-p (aref arr y x))
+            (setf digits (append digits (list (parse-integer (coerce (list (aref arr y x)) 'string))))))))
+
+    ;; diagonally up and to the right
+    (let ((x (+ i 1))
+	  (y (- j 1)))
+      (unless (or (= i max-i) (= j 0))
+	(if (digit-char-p (aref arr y x))
+            (setf digits (append digits (list (parse-integer (coerce (list (aref arr y x)) 'string))))))))
+
+    ;; diagonally down and to the right
+    (let ((x (+ i 1))
+	  (y (+ j 1)))
+      (unless (or (= j max-j) (= i max-i))
+	(if (digit-char-p (aref arr y x))
+            (setf digits (append digits (list (parse-integer (coerce (list (aref arr y x)) 'string))))))))
+ 
+    ;; directly to the right, could be a next digit
+    (let ((x (+ i 1))
+	  (y j))
+      (unless (= i max-i)
+	(if (digit-char-p (aref arr y x))
+            (setf digits (append digits (list (parse-integer (coerce (list (aref arr y x)) 'string))))))))
+
+    (reduce #'* digits)))
+
 (defun special-char-p (ch)
   (cond ((eql ch #\.) nil)
 	((digit-char-p ch) nil)
