@@ -25,6 +25,46 @@
 	    (setf valid-part-numbers (append valid-part-numbers (list (parse-integer curr-num-buff))))
 	    (setf curr-num-buff ""))))
     (reduce #'+ valid-part-numbers)))
+
+(defun solution-day-3-part-2 (file-path)
+  (let* ((arr (init-arr file-path))
+	 (nums (init-nums arr))
+	 (i-max (array-dimension arr 1))
+	 (j-max (array-dimension arr 0))
+	 (gear-ratios '()))
+    (do ((j 0 (+ 1 j)))
+	((= j j-max) nil)
+      (do ((i 0 (+ 1 i)))
+	  ((= i i-max) nil)
+	(if (eql #\* (aref arr j i))
+	    (append gear-ratios (list (gear-ratio arr nums i j))))))
+    (reduce #'+ gear-ratios)))
+
+(defun init-nums (arr)
+  (let ((nums (make-array (list (array-dimension arr 0) (array-dimension arr 1))))
+	(i-max (array-dimension arr 1))
+	(j-max (array-dimension arr 0))
+	(curr-num-buff "")
+	(curr-coords '()))
+    (do ((j 0 (+ 1 j)))
+	((= j j-max) nil)
+      (do ((i 0 (+ 1 i)))
+	  ((= i i-max) nil)
+	(if (digit-char-p (aref arr j i))
+	    (progn
+	      (setf curr-num-buff (concatenate 'string curr-num-buff (coerce (list (aref arr j i)) 'string)))
+	      (setf curr-coords (append curr-coords (list (list j i)))))
+	    (if (not (string= curr-num-buff ""))
+		(progn
+		  (mapcar #'(lambda (x) (setf (aref nums (car x) (cadr x)) (parse-integer curr-num-buff))) curr-coords)
+		  (setf curr-num-buff "")
+		  (setf curr-coords '())))))
+      (if (not (string= curr-num-buff ""))
+	  (progn
+	    (mapcar #'(lambda (x) (setf (aref nums (car x) (cadr x)) (parse-integer curr-num-buff))) curr-coords)
+	    (setf curr-num-buff "")
+	    (setf curr-coords '()))))
+    nums))
   
 (defun init-arr (file-path)
   (let* ((lines (uiop:read-file-lines file-path))
@@ -101,73 +141,68 @@
 
     (reduce #'(lambda (x y) (or x y)) (map 'list #'car results))))
 
-(defun gear-ratio (arr i j)
-  ;; skip all this work if the character isn't #\*
-  (when (not (eql #\* (aref arr j i)))
+(defun gear-ratio (arr nums i j)
+  ;; skip all this work if the character isn't a number
+  (when (not (digit-char-p (aref arr j i)))
     (return-from gear-ratio nil))
   
-  (let ((digits '())
+  (let ((results '())
 	(max-i (- (array-dimension arr 1) 1))
 	(max-j (- (array-dimension arr 0) 1)))
 
-    ;; diagonally up and to the left
+    ;; diagonally up and to the left, don't search if we are the next digit
     (let ((x (- i 1))
 	  (y (- j 1))) 
-      (unless (or (= i 0) (= j 0))
-	(if (digit-char-p (aref arr y x))
-            (setf digits (append digits (list (parse-integer (coerce (list (aref arr y x)) 'string))))))))
+      (unless (or (or (= i 0) (= j 0)))
+        (setf results (append results (list (list (special-char-p (aref arr y x)) :diagonal-up-left))))))
 
-    ;; directly to the left
+    ;; directly to the left, could be a prev digit
     (let ((x (- i 1))
 	  (y j))
-      (unless (= i 0)
+      (unless (or (= i 0))
 	(if (digit-char-p (aref arr y x))
-            (setf digits (append digits (list (parse-integer (coerce (list (aref arr y x)) 'string))))))))
+	    (setf results (append results (list (list (is-connected-p arr x y :prev-digit t) :behind))))
+	    (setf results (append results (list (list (special-char-p (aref arr y x)) :behind)))))))
 
-
-    ;; diagonally down and to the left
+    ;; diagonally down and to the left, don't search if we are the next digit
     (let ((x (- i 1))
 	  (y (+ j 1)))
-      (unless (or (= j max-j) (= i 0))
-	(if (digit-char-p (aref arr y x))
-            (setf digits (append digits (list (parse-integer (coerce (list (aref arr y x)) 'string))))))))
+      (unless (or (or (= j max-j) (= i 0)))
+        (setf results (append results (list (list (special-char-p (aref arr y x)) :diagonal-down-left))))))
 
     ;; directly above
     (let ((x i)
 	  (y (- j 1)))
       (unless (= j 0)
-	(if (digit-char-p (aref arr y x))
-            (setf digits (append digits (list (parse-integer (coerce (list (aref arr y x)) 'string))))))))
+        (setf results (append results (list (list (special-char-p (aref arr y x)) :above))))))
 
     ;; directly below
     (let ((x i)
 	  (y (+ j 1)))
       (unless (= j max-j)
-	(if (digit-char-p (aref arr y x))
-            (setf digits (append digits (list (parse-integer (coerce (list (aref arr y x)) 'string))))))))
+        (setf results (append results (list (list (special-char-p (aref arr y x)) :below))))))
 
     ;; diagonally up and to the right
     (let ((x (+ i 1))
 	  (y (- j 1)))
-      (unless (or (= i max-i) (= j 0))
-	(if (digit-char-p (aref arr y x))
-            (setf digits (append digits (list (parse-integer (coerce (list (aref arr y x)) 'string))))))))
+      (unless (or (= i max-i) (= j 0) prev-digit)
+        (setf results (append results (list (list (special-char-p (aref arr y x)) :diagonal-up-right))))))
 
     ;; diagonally down and to the right
     (let ((x (+ i 1))
 	  (y (+ j 1)))
-      (unless (or (= j max-j) (= i max-i))
-	(if (digit-char-p (aref arr y x))
-            (setf digits (append digits (list (parse-integer (coerce (list (aref arr y x)) 'string))))))))
+      (unless (or (= j max-j) (= i max-i) prev-digit)
+        (setf results (append results (list (list (special-char-p (aref arr y x)) :diagonal-down-right))))))
  
     ;; directly to the right, could be a next digit
     (let ((x (+ i 1))
 	  (y j))
-      (unless (= i max-i)
+      (unless (or (= i max-i) prev-digit)
 	(if (digit-char-p (aref arr y x))
-            (setf digits (append digits (list (parse-integer (coerce (list (aref arr y x)) 'string))))))))
+	    (setf results (append results (list (list (is-connected-p arr x y :next-digit t) :right))))
+	    (setf results (append results (list (list (special-char-p (aref arr y x)) :right)))))))
 
-    (reduce #'* digits)))
+    (reduce #'(lambda (x y) (or x y)) (map 'list #'car results))))
 
 (defun special-char-p (ch)
   (cond ((eql ch #\.) nil)
