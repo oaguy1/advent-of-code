@@ -4,24 +4,21 @@
 
 (in-package #:aoc-2023-day-4)
 
-(defvar *max-blue* 14)
-(defvar *max-green* 13)
-(defvar *max-red* 12)
 
 (defun solution-day-4-part-1 (file-path)
   (reduce #'+ (map 'list #'get-score (uiop:read-file-lines file-path))))
 
-(defun get-id (str)
-  (parse-integer (cadr (split-by-space (car (split-by-colon str))))))
-
-(defun valid-game-p (str)
-  (every #'within-max-dice (map 'list #'split-by-space (car (map 'list #'split-by-punctuation (cdr (split-by-colon str)))))))
-
-(defun get-power (str)
-  (map 'list #'split-by-space (car (map 'list #'split-by-punctuation (cdr (split-by-colon str))))))
-
-
 (defun get-score (str)
+  (let* ((score 0)
+	 (strs (split-by-bar (cadr (split-by-colon str))))
+	 (winning-nums (map 'list #'parse-integer (split-by-space (car strs))))
+	 (card-nums (map 'list #'parse-integer (split-by-space (cadr strs)))))
+    (dolist (curr-num winning-nums)
+      (if (member curr-num card-nums)
+	  (incf score)))
+    (if (> score 0)
+	(expt 2 (- score 1))
+	0)))
 
 (defun split-by-space (str)
   (split-string-by (lambda (x) (eql x #\Space)) str))
@@ -38,7 +35,7 @@
 (defun split-string-by-helper (delimiter-p str next-token)
   (cond ((string= str "")
 	 (list (string-trim '(#\Space #\Tab #\Newline) next-token)))
-	((funcall delimiter-p (char str 0))
+	((and (funcall delimiter-p (char str 0)) (not (string= next-token "")))
 	 (concatenate 'list (list (string-trim '(#\Space #\Tab #\Newline) next-token)) (split-string-by-helper delimiter-p (subseq str 1) "")))
 	(t
 	 (split-string-by-helper delimiter-p (subseq str 1) (concatenate 'string next-token (subseq str 0 1))))))
