@@ -131,3 +131,7 @@ dmypy.json
 # IDE config
 .vscode
 .idea
+
+# MacOS Specific
+.DS_Store
+*/.DS_Store
