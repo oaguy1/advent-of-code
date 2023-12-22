@@ -4,6 +4,24 @@
 
 (in-package #:aoc-2023-day-5)
 
+(defclass range ()
+  ((start
+    :initarg :start
+    :accessor range-start)
+   (length
+    :initarg :length
+    :accessor range-length)))
+
+(defmethod range-end ((r range))
+  (+ (range-start r) (- (range-length r) 1)))
+
+(defmethod in-range-p ((r range) value)
+  (and (>= value (range-start r))
+       (<= value (range-end r))))
+
+(defun in-ranges-p (ranges value)
+  (some #'(lambda (x) (not (not x))) (mapcar #'(lambda (r) (in-range-p r value)) ranges)))
+  
 
 (defclass value-mapping ()
   ((destination-start
@@ -17,13 +35,18 @@
     :accessor mapping-range)))
 
 
-(defmethod in-map-p ((value-map value-mapping) value)
-  (and (>= value (mapping-source-start value-map))
-      (<= value (+ (mapping-source-start value-map) (mapping-range value-map)))))
+(defmethod in-map-p ((value-map value-mapping) value &key reverse-map)
+  (if reverse-map
+    (and (>= value (mapping-destination-start value-map))
+        (<= value (+ (mapping-destination-start value-map) (mapping-range value-map))))
+    (and (>= value (mapping-source-start value-map))
+        (<= value (+ (mapping-source-start value-map) (mapping-range value-map))))))
 
-(defmethod map-value ((value-map value-mapping) value)
-  (if (in-map-p value-map value)
-      (+ (mapping-destination-start value-map) (- value (mapping-source-start value-map)))
+(defmethod map-value ((value-map value-mapping) value &key reverse-map)
+  (if (in-map-p value-map value :reverse-map reverse-map)
+      (if reverse-map
+	  (+ (mapping-source-start value-map) (- value (mapping-destination-start value-map)))
+	  (+ (mapping-destination-start value-map) (- value (mapping-source-start value-map))))
       nil))
 
 (defclass value-map-collection ()
@@ -31,8 +54,8 @@
     :initarg :value-mappings
     :accessor collection-value-maps)))
 	
-(defmethod map-value ((collection value-map-collection) value)
-  (let ((results (mapcar #'(lambda (value-map) (map-value value-map value)) (collection-value-maps collection))))
+(defmethod map-value ((collection value-map-collection) value &key reverse-map)
+  (let ((results (mapcar #'(lambda (value-map) (map-value value-map value :reverse-map reverse-map)) (collection-value-maps collection))))
     (if (every #'not results)
 	value
 	(find-if #'(lambda (x) (not (not x))) results))))
@@ -42,26 +65,56 @@
     :initarg :collections
     :accessor chain-mapping-collections)))
 
-(defmethod map-value ((chain mapping-chain) value)
-  (let ((input value))
-    (dolist (map-collection (chain-mapping-collections chain))
-      (setf input (map-value map-collection input)))
+(defmethod map-value ((chain mapping-chain) value &key reverse-map)
+  (let ((input value)
+	(collection (chain-mapping-collections chain)))
+    (if reverse-map
+	(setf collection (reverse collection)))
+    (dolist (map-collection collection)
+      (setf input (map-value map-collection input :reverse-map reverse-map)))
     input))
 
 (defun solution-day-5-part-1 (file-path)
-  (let ((file-input (uiop:read-file-lines file-path))
+  (let ((map-chain (parse-file file-path))
 	(seeds '())
+	(file-input (uiop:read-file-lines file-path)))
+    (setf seeds (parse-seeds (car file-input)))
+    (apply #'min (mapcar #'(lambda (x) (map-value map-chain x)) seeds))))
+
+;; (defun solution-day-5-part-2 (file-path)
+;;   (let ((map-chain (parse-file file-path))
+;; 	(seeds '())
+;; 	(file-input (uiop:read-file-lines file-path)))
+;;     (setf seeds (parse-seed-ranges (car file-input)))
+;;     (apply #'min (mapcar #'(lambda (x) (map-value map-chain x)) (apply #'append (mapcar #'range-values seeds))))))
+
+(defun solution-day-5-part-2 (file-path &key (start 0))
+  (let ((map-chain (parse-file file-path))
+	(seeds '())
+	(file-input (uiop:read-file-lines file-path))
+	(end 5000000000))
+    (setf seeds (parse-seed-ranges (car file-input)))
+    (loop for x from start to end
+	  do
+	     (format t "~A~%" x)
+	     (let* ((seed-value (map-value map-chain x :reverse-map t))
+		    (in-seeds (in-ranges-p seeds seed-value)))
+	       (if in-seeds
+		   (return x))))))
+	       
+    ;;(apply #'min (mapcar #'(lambda (x) (map-value map-chain x)) (apply #'append (mapcar #'range-values seeds))))))
+      
+(defun parse-file (file-path)
+  (let ((file-input (uiop:read-file-lines file-path))
 	(seed-to-soil-map nil)
 	(soil-to-fertilizer-map nil)
 	(fertilizer-to-water-map nil)
 	(water-to-light-map nil)
 	(light-to-temperature-map nil)
 	(temerature-to-humidity-map nil)
-	(humidity-to-location-map nil)
-	(map-chain nil))
+	(humidity-to-location-map nil))
 
     ;; read in seeds and advance three lines 
-    (setf seeds (parse-seeds (car file-input)))
     (setf file-input (cdddr file-input))
 
     ;; read in seed-to-soil map and advance two lines
@@ -127,20 +180,28 @@
       (setf humidity-to-location-map (make-instance 'value-map-collection :value-mappings mappings)))
     (setf file-input (cddr file-input))
 
-    (setf map-chain (make-instance 'mapping-chain
-				   :collections (list
-						 seed-to-soil-map
-						 soil-to-fertilizer-map
-						 fertilizer-to-water-map
-						 water-to-light-map
-						 light-to-temperature-map
-						 temerature-to-humidity-map
-						 humidity-to-location-map)))
+    (make-instance 'mapping-chain
+		   :collections (list
+				 seed-to-soil-map
+				 soil-to-fertilizer-map
+				 fertilizer-to-water-map
+				 water-to-light-map
+				 light-to-temperature-map
+				 temerature-to-humidity-map
+				 humidity-to-location-map))))
 
-    (apply #'min (map 'list #'(lambda (x) (map-value map-chain x)) seeds))))
 
 (defun parse-seeds (str)
   (mapcar #'parse-integer (split-by-space (cadr (split-by-colon str)))))
+
+(defun parse-seed-ranges (str)
+  (let ((nums (mapcar #'parse-integer (split-by-space (cadr (split-by-colon str)))))
+	(ranges '()))
+    (loop while (not (not (cadr nums)))
+	  do
+	     (setf ranges (append ranges (list (make-instance 'range :start (car nums) :length (cadr nums)))))
+	     (setf nums (cddr nums)))
+    ranges))
 
 (defun parse-mapping (str)
   (let ((mapping (mapcar #'parse-integer (split-by-space str))))
