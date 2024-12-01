@@ -20,9 +20,9 @@
   (< (position x *hand-types*) (position y *hand-types*)))
 
 (defun count-comparator (x y)
-  (if (eql (cdr x) (cdr y))
+  (if (= (cdr x) (cdr y))
       (card-comparator (car x) (car y))
-      (< (cdr x) (cdr y))))
+      (> (cdr x) (cdr y))))
  
 (defclass hand ()
   ((cards
@@ -30,43 +30,54 @@
     :accessor hand-cards)))
 
 (defmethod hand-type ((h hand))
-  (let* ((card-counts (value-counts (hand-cards h)))
+  (let* ((card-counts (sort (value-counts (hand-cards h)) #'count-comparator))
 	 (counts (sort (map 'list #'cdr card-counts) #'>)))
-    (cond ((member 5 counts) (list :five-of-a-kind (significant-cards :five-of-a-kind card-counts)))
-	  ((member 4 counts) (list :four-of-a-kind (significant-cards :four-of-a-kind card-counts)))
-	  ((and (member 3 counts) (member 2 counts)) (list :full-house (significant-cards :full-house card-counts)))
-	  ((member 3 counts) (list :three-of-a-kind (significant-cards :three-of-a-kind card-counts)))
-	  ((and (= 2 (car counts)) (= 2 (cadr counts))) (list :two-pairs (significant-cards :two-pairs card-counts)))
-	  ((member 2 counts) (list :pair (significant-cards :pair card-counts)))
-	  (t (list :high-card (sort (hand-cards h) #'card-comparator))))))
-
-(defun significant-cards (type-of-hand card-counts)
-  (case type-of-hand
-    (:five-of-a-kind (list (caar (value-assoc 5 card-counts))))
-    (:four-of-a-kind (list (caar (value-assoc 4 card-counts))))
-    (:full-house (list (caar (value-assoc 3 card-counts)) (caar (value-assoc 2 card-counts))))
-    (:three-of-a-kind (list (caar (value-assoc 3 card-counts))))
-    (:two-pairs (sort (list (caar (value-assoc 2 card-counts)) (caadr (value-assoc 2 card-counts))) #'card-comparator))
-    (:pair (list (caar (value-assoc 2 card-counts))))))
-    
+    (cond ((member 5 counts) :five-of-a-kind)
+	  ((member 4 counts) :four-of-a-kind)
+	  ((and (member 3 counts) (member 2 counts)) :full-house)
+	  ((member 3 counts) :three-of-a-kind)
+	  ((and (= 2 (car counts)) (= 2 (cadr counts))) :two-pairs)
+	  ((member 2 counts) :pair)
+	  (t :high-card))))
 
 (defun value-assoc (item assoc-list)
   (remove-if-not #'(lambda (x) (eql (cdr x) item)) assoc-list))
 
 (defun hand-comparator (hand1 hand2)
-  (let ((type-of-hand1 (hand-type hand1))
-	(type-of-hand2 (hand-type hand2)))
-    (if (eql (car type-of-hand1) (car type-of-hand2))
-	(if (< 1 (length (cdr type-of-hand1)))
-	    (let ((lst1 (cadr type-of-hand1))
-		  (lst2 (cadr type-of-hand2)))
-	      (loop while (eql (car lst1) (car lst2))
-		    do
-		       (setf lst1 (cdr lst1))
-		       (setf lst2 (cdr lst2)))
-	      (card-comparator (car lst1) (car lst2)))
-	    (card-comparator (caadr type-of-hand1) (caadr type-of-hand2)))
-	(hand-type-comparator (car type-of-hand1) (car type-of-hand2)))))
+  (let ((hand1-type (hand-type hand1))
+	(hand1-value-counts (sort (value-counts (hand-cards hand1)) #'count-comparator))
+	(hand2-type (hand-type hand2))
+	(hand2-value-counts (sort (value-counts (hand-cards hand2)) #'count-comparator)))
+    (hand-comparator-helper hand1-type hand1-value-counts hand2-type hand2-value-counts)))
+
+(defun hand-comparator-helper (hand1-type hand1-value-counts hand2-type hand2-value-counts)
+  (cond ((and (not hand1-value-counts) (not hand2-value-counts)) nil)
+	((and
+	  (eql hand1-type hand2-type)
+	  (= (cdar hand1-value-counts) (cdar hand2-value-counts))
+	  (eql (caar hand1-value-counts) (caar hand2-value-counts)))
+	 (hand-comparator-helper hand1-type (cdr hand1-value-counts) hand2-type (cdr hand2-value-counts)))
+	((and
+	  (eql hand1-type hand2-type)
+	  (= (cdar hand1-value-counts) (cdar hand2-value-counts)))
+	 (card-comparator (caar hand1-value-counts) (caar hand2-value-counts)))
+	((eql hand1-type hand2-type) (> (cdar hand1-value-counts) (cdar hand2-value-counts)))
+	(t (hand-type-comparator hand1-type hand2-type))))
+
+;; (defun hand-comparator (hand1 hand2)
+;;   (let ((type-of-hand1 (hand-type hand1))
+;; 	(type-of-hand2 (hand-type hand2)))
+;;     (if (eql (car type-of-hand1) (car type-of-hand2))
+;; 	(if (< 1 (length (cdr type-of-hand1)))
+;; 	    (let ((lst1 (cadr type-of-hand1))
+;; 		  (lst2 (cadr type-of-hand2)))
+;; 	      (loop while (eql (car lst1) (car lst2))
+;; 		    do
+;; 		       (setf lst1 (cdr lst1))
+;; 		       (setf lst2 (cdr lst2)))
+;; 	      (card-comparator (car lst1) (car lst2)))
+;; 	    (card-comparator (caadr type-of-hand1) (caadr type-of-hand2)))
+;; 	(hand-type-comparator (car type-of-hand1) (car type-of-hand2)))))
     
 
 (defun value-counts (lst &optional (counts '()))
@@ -84,9 +95,17 @@
   (let ((lines (uiop:read-file-lines file-path)))
     (loop for line in lines
 	  collect (list
-		   (make-instance 'hand :cards (map 'list #'identity (car (split-by-space line))))
+		   (make-instance 'hand :cards (car (split-by-space line)))
 		   (parse-integer (cadr (split-by-space line)))))))
 
+(defun prep-card-str (str)
+  (setf str (substitute (code-char (+ (char-code #\9) 1)) #\T str))
+  (setf str (substitute (code-char (+ (char-code #\9) 2)) #\J str))
+  (setf str (substitute (code-char (+ (char-code #\9) 3)) #\Q str))
+  (setf str (substitute (code-char (+ (char-code #\9) 4)) #\K str))
+  (setf str (substitute (code-char (+ (char-code #\9) 5)) #\A str))
+  str)
+  
 
 (defun split-by-space (str)
   (split-string-by (lambda (x) (eql x #\Space)) str))
